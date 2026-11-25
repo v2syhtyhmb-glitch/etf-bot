@@ -2,7 +2,7 @@ import os
 import yfinance as yf
 import requests
 
-BOT_TOKEN = os.environ.get("9132978624:AAETY7iC9ieC6qD2zGikNvNGIFwdBeygJWI")
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
 CHAT_ID = "8980328689"
 
 etfs = ["VOO", "QQQM", "SCHD"]
