@@ -21,5 +21,6 @@ for etf in etfs:
         message += f"{etf}: 데이터 불러오기 실패\n"
 
 url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-requests.post(url, json={"chat_id": CHAT_ID, "text": message})
+response = requests.post(url, json={"chat_id": CHAT_ID, "text": message})
+print("텔레그램 응답:", response.text)
 print("전송완료")
