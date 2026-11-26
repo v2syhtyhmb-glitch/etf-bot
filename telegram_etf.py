@@ -17,23 +17,17 @@ IRP_2027 = 250000
 
 # ==================== ✈️ 휴가 카운트다운 ====================
 def get_vacation_msg():
-    base = date(2027, 1, 10)  # 기준 휴가
+    base = date(2027, 1, 10)
     today_d = datetime.now().date()
     cycle = 84
-
-    # 가장 가까운 미래 휴가 찾기
     temp = base
-    # 오늘보다 과거면 84일씩 더하기
     while temp < today_d:
         temp += timedelta(days=cycle)
-    # 오늘보다 너무 미래면 84일씩 빼기 (예: 2026년일 때)
     while temp - timedelta(days=cycle) >= today_d:
         temp -= timedelta(days=cycle)
-
     next_vac = temp
     prev_vac = next_vac - timedelta(days=cycle)
     dday = (next_vac - today_d).days
-
     if dday == 0:
         return f"✈️ 오늘이 휴가다! 🎉 즐거운 휴가 보내!\n   📅 다음 휴가: {next_vac + timedelta(days=cycle)}"
     elif dday <= 7:
@@ -249,40 +243,34 @@ else:
     fg_comment = "극단적 탐욕! 조심조심 ⚠️"
 fg_msg = f"{fg_emoji} 공포탐욕지수 : {fg_score}점 ({fg_rating})\n   ↳ {fg_comment}"
 
+# ==================== 📊 보유종목 전체 9종 (평일용 짧은 버전) ====================
 core_msg = ""
 total_krw = 0
 total_from_high = 0
 cnt = 0
-emojis = {"AAPL": "🍎", "VOO": "🇺🇸", "QQQM": "💻"}
-for name, code, qty, cur in holdings[:3]:
+emojis = {
+    "AAPL": "🍎", "VOO": "🇺🇸", "QQQM": "💻",
+    "TIGER 미국S&P500": "🇰🇷", "KODEX 미국나스닥100": "🇰🇷",
+    "SOL 미국배당다우존스": "🇰🇷", "TIGER 미국배당다우존스": "🇰🇷",
+    "KODEX 미국우주항공": "🚀", "SOL 조선TOP3플러스": "🚢"
+}
+for name, code, qty, cur in holdings:
     try:
         price, chg, ma5, from_high = get_info(code)
         total_from_high += from_high
         cnt += 1
-        val_usd = price * qty
-        val_krw = val_usd * usdkrw
         chg_emoji = "🔴" if chg < 0 else "🟢"
-        if from_high <= -15:
-            risk = "💎 할인 구간!"
-        elif chg <= -2:
-            risk = "🛒 적립 기회!"
-        elif price < ma5:
-            risk = "⏳ 조정 중 / 보유"
+        if cur == "$":
+            val_usd = price * qty
+            val_krw = val_usd * usdkrw
+            total_krw += val_krw
+            core_msg += f"{emojis.get(name,'📊')} {name} ${price:.1f} {chg_emoji} {chg:+.1f}% | {val_krw/10000:.0f}만원\n"
         else:
-            risk = "✅ 추세 양호 / 보유"
-        core_msg += f"{emojis.get(name,'📊')} {name} : ${price:.2f} {chg_emoji} {chg:+.2f}%\n   ↳ 평가액 {val_usd:,.0f}$ ({val_krw:,.0f}원) / 고점 대비 {from_high:.1f}% / {risk}\n"
+            val_krw = price * qty
+            total_krw += val_krw
+            core_msg += f"{emojis.get(name,'📊')} {name} {price:,.0f}원 {chg_emoji} {chg:+.1f}% | {val_krw/10000:.0f}만원\n"
     except:
         core_msg += f"{emojis.get(name,'📊')} {name} : 데이터 없음\n"
-
-for name, code, qty, cur in holdings:
-    try:
-        price, _, _, _ = get_info(code)
-        if cur == "$":
-            total_krw += price * qty * usdkrw
-        else:
-            total_krw += price * qty
-    except:
-        pass
 
 sp_news = get_google_news("S&P500 뉴욕증시", 2)
 aapl_news = get_yahoo_news("AAPL", 2)
@@ -380,7 +368,7 @@ message = f"""━━━━━━━━━━━━━━━━
 {news_msg}
 
 ━━━━━━━━━━━━━━━━
-📊 보유종목 (핵심 3종)
+📊 보유종목 (전체 9종)
 {core_msg}
 💰 전체 평가액 약 {total_krw:,.0f}원
    (환율 {usdkrw:,.0f}원 적용)
