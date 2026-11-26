@@ -2,8 +2,9 @@ import os
 import yfinance as yf
 import requests
 import xml.etree.ElementTree as ET
-from datetime import datetime
+from datetime import datetime, date, timedelta
 from urllib.parse import quote
+import math
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 CHAT_ID = "8980328689"
@@ -14,10 +15,37 @@ IRP_2026 = 600000
 PENSION_2027 = 360000
 IRP_2027 = 250000
 
+# ==================== ✈️ 휴가 카운트다운 ====================
+def get_vacation_msg():
+    base = date(2027, 1, 10)  # 기준 휴가
+    today_d = datetime.now().date()
+    cycle = 84
+
+    # 가장 가까운 미래 휴가 찾기
+    temp = base
+    # 오늘보다 과거면 84일씩 더하기
+    while temp < today_d:
+        temp += timedelta(days=cycle)
+    # 오늘보다 너무 미래면 84일씩 빼기 (예: 2026년일 때)
+    while temp - timedelta(days=cycle) >= today_d:
+        temp -= timedelta(days=cycle)
+
+    next_vac = temp
+    prev_vac = next_vac - timedelta(days=cycle)
+    dday = (next_vac - today_d).days
+
+    if dday == 0:
+        return f"✈️ 오늘이 휴가다! 🎉 즐거운 휴가 보내!\n   📅 다음 휴가: {next_vac + timedelta(days=cycle)}"
+    elif dday <= 7:
+        return f"✈️ 휴가까지 D-{dday}일! 곧이다! 짐 싸자! 🧳\n   📅 다음 휴가: {next_vac} (일요일)"
+    elif dday <= 30:
+        return f"✈️ 휴가까지 D-{dday}일! 한 달도 안 남았어!\n   📅 다음 휴가: {next_vac} (일요일)"
+    else:
+        return f"✈️ 휴가까지 D-{dday}일\n   📅 다음 휴가: {next_vac} (일요일) / 지난 휴가: {prev_vac}"
+
 # ==================== ☀️ 주베일 날씨 ====================
 def get_jubail_weather():
     try:
-        # Jubail: 위도 27.0, 경도 49.65
         url = "https://api.open-meteo.com/v1/forecast?latitude=27.0&longitude=49.65&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min&timezone=Asia%2FRiyadh&forecast_days=1"
         r = requests.get(url, timeout=10).json()
         cur = r["current"]
@@ -28,7 +56,6 @@ def get_jubail_weather():
         tmax = daily["temperature_2m_max"][0]
         tmin = daily["temperature_2m_min"][0]
         code = cur["weather_code"]
-        # 날씨 코드 -> 이모지
         if code in [0, 1]:
             w_emoji, w_txt = "☀️", "맑음"
         elif code in [2, 3]:
@@ -61,13 +88,11 @@ ENGLISH_SENTENCES = [
     ("I learned something new today.", "오늘 새로운 걸 배웠어."),
     ("Take care and stay safe on site.", "현장에서는 조심하고 안전하게 지내."),
     ("See you tomorrow at the same time.", "내일 같은 시간에 봐!"),
-    # ... 여기에 계속 추가하면 365개까지 가능!
 ]
 
 def get_english_3():
     today = datetime.now()
     day_of_year = today.timetuple().tm_yday
-    # 날짜 기준으로 3개씩 돌아가면서 뽑기
     start = (day_of_year * 3) % len(ENGLISH_SENTENCES)
     picked = [ENGLISH_SENTENCES[(start + i) % len(ENGLISH_SENTENCES)] for i in range(3)]
     msg = "📚 오늘의 영어 3문장\n"
@@ -75,7 +100,7 @@ def get_english_3():
         msg += f"{idx}. {en}\n   = {ko}\n"
     return msg
 
-# ==================== 기존 포트폴리오 코드 ====================
+# ==================== 포트폴리오 ====================
 holdings = [
     ("AAPL", "AAPL", 36, "$"),
     ("VOO", "VOO", 14.765993, "$"),
@@ -171,11 +196,10 @@ today = datetime.now()
 today_str = today.strftime("%Y-%m-%d")
 is_sunday = today.weekday() == 6
 
-# 날씨 + 영어 가져오기
+vacation_msg = get_vacation_msg()
 weather_msg = get_jubail_weather()
 english_msg = get_english_3()
 
-# 환율
 try:
     krw_hist = yf.Ticker("KRW=X").history(period="2d")["Close"]
     usdkrw = krw_hist.iloc[-1]
@@ -186,7 +210,6 @@ except:
     usdkrw = 1470
     fx_msg = "💱 달러/원 : 확인 불가"
 
-# 시장
 indices = {"S&P500": ("^GSPC","🇺🇸"), "NASDAQ": ("^IXIC","💻"), "DOW": ("^DJI","🏭"), "VIX": ("^VIX","😨"), "미국채10년": ("^TNX","🏦")}
 market_msg = ""
 sp_chg = 0
@@ -335,10 +358,12 @@ if is_sunday:
 📅 다음 주 체크 : CPI / FOMC 일정 + 배당락일 확인
 """
 
-# ==================== 최종 메시지 ====================
 message = f"""━━━━━━━━━━━━━━━━
 ☀️ [주베일 아침 브리핑]
 📅 {today_str} / {period_label}
+━━━━━━━━━━━━━━━━
+{vacation_msg}
+
 ━━━━━━━━━━━━━━━━
 {weather_msg}
 
