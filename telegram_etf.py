@@ -14,6 +14,68 @@ IRP_2026 = 600000
 PENSION_2027 = 360000
 IRP_2027 = 250000
 
+# ==================== ☀️ 주베일 날씨 ====================
+def get_jubail_weather():
+    try:
+        # Jubail: 위도 27.0, 경도 49.65
+        url = "https://api.open-meteo.com/v1/forecast?latitude=27.0&longitude=49.65&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min&timezone=Asia%2FRiyadh&forecast_days=1"
+        r = requests.get(url, timeout=10).json()
+        cur = r["current"]
+        daily = r["daily"]
+        temp = cur["temperature_2m"]
+        hum = cur["relative_humidity_2m"]
+        wind = cur["wind_speed_10m"]
+        tmax = daily["temperature_2m_max"][0]
+        tmin = daily["temperature_2m_min"][0]
+        code = cur["weather_code"]
+        # 날씨 코드 -> 이모지
+        if code in [0, 1]:
+            w_emoji, w_txt = "☀️", "맑음"
+        elif code in [2, 3]:
+            w_emoji, w_txt = "⛅", "흐림"
+        elif code in [45, 48]:
+            w_emoji, w_txt = "🌫️", "안개"
+        elif code in [51, 53, 55, 61, 63, 65]:
+            w_emoji, w_txt = "🌧️", "비"
+        else:
+            w_emoji, w_txt = "🌤️", "대체로 맑음"
+        wind_msg = "💨 오후 바람 강해짐 주의!" if wind >= 20 else f"💨 바람 {wind:.0f} km/h"
+        return f"{w_emoji} 주베일 날씨 - {w_txt}\n🌡 현재 {temp:.0f}°C / 최고 {tmax:.0f}°C / 최저 {tmin:.0f}°C\n💧 습도 {hum:.0f}% / {wind_msg}"
+    except:
+        return "☀️ 주베일 날씨 - 확인 불가"
+
+# ==================== 📚 오늘의 영어 3문장 ====================
+ENGLISH_SENTENCES = [
+    ("Watching the sunset makes me really happy.", "일몰을 보는 게 날 정말 행복하게 해!"),
+    ("Let's grab a coffee after work.", "퇴근하고 커피 한 잔 하자."),
+    ("The weather is perfect for a walk.", "산책하기 딱 좋은 날씨야!"),
+    ("I need to check the site schedule first.", "현장 일정부터 확인해야 해."),
+    ("Can we have a quick meeting at 10?", "10시에 간단히 회의할 수 있을까?"),
+    ("Don't forget to wear your helmet.", "헬멧 쓰는 거 잊지 마."),
+    ("This project is going really well.", "이 프로젝트 정말 잘 진행되고 있어."),
+    ("I'm so tired today, I need an early night.", "오늘 너무 피곤해서 일찍 자야겠어."),
+    ("What time is the concrete pouring?", "콘크리트 타설이 몇 시야?"),
+    ("Please send me the drawings by email.", "도면 이메일로 보내줘."),
+    ("Let's finish this before lunch.", "점심 전에 이거 끝내자."),
+    ("The wind is too strong to work at height.", "바람이 너무 세서 고소 작업은 어려워."),
+    ("I learned something new today.", "오늘 새로운 걸 배웠어."),
+    ("Take care and stay safe on site.", "현장에서는 조심하고 안전하게 지내."),
+    ("See you tomorrow at the same time.", "내일 같은 시간에 봐!"),
+    # ... 여기에 계속 추가하면 365개까지 가능!
+]
+
+def get_english_3():
+    today = datetime.now()
+    day_of_year = today.timetuple().tm_yday
+    # 날짜 기준으로 3개씩 돌아가면서 뽑기
+    start = (day_of_year * 3) % len(ENGLISH_SENTENCES)
+    picked = [ENGLISH_SENTENCES[(start + i) % len(ENGLISH_SENTENCES)] for i in range(3)]
+    msg = "📚 오늘의 영어 3문장\n"
+    for idx, (en, ko) in enumerate(picked, 1):
+        msg += f"{idx}. {en}\n   = {ko}\n"
+    return msg
+
+# ==================== 기존 포트폴리오 코드 ====================
 holdings = [
     ("AAPL", "AAPL", 36, "$"),
     ("VOO", "VOO", 14.765993, "$"),
@@ -101,7 +163,6 @@ def get_dividend_info():
     return msg
 
 def bar(pct):
-    # 게이지바 만들기
     pct = max(0, min(100, pct))
     filled = int(pct / 10)
     return "🟩" * filled + "⬜" * (10 - filled) + f" {pct:.0f}%"
@@ -109,6 +170,10 @@ def bar(pct):
 today = datetime.now()
 today_str = today.strftime("%Y-%m-%d")
 is_sunday = today.weekday() == 6
+
+# 날씨 + 영어 가져오기
+weather_msg = get_jubail_weather()
+english_msg = get_english_3()
 
 # 환율
 try:
@@ -135,7 +200,6 @@ for name, (code, emoji) in indices.items():
     except:
         market_msg += f"{emoji} {name} : 데이터 없음\n"
 
-# 급락 알림
 alert_msg = ""
 if sp_chg <= -2:
     alert_msg = f"\n🚨🚨 급락 알림! S&P500 {sp_chg:.2f}% 급락 중! 💸 추가 매수 기회?\n"
@@ -144,7 +208,6 @@ elif sp_chg <= -1:
 elif sp_chg >= 1:
     alert_msg = f"\n🎉 S&P500 {sp_chg:.2f}% 상승! 기분 좋게 적립 고고! 🚀\n"
 
-# 공포탐욕
 fg_score, fg_rating = get_fear_greed()
 if fg_score < 25:
     fg_emoji = "😱"
@@ -163,7 +226,6 @@ else:
     fg_comment = "극단적 탐욕! 조심조심 ⚠️"
 fg_msg = f"{fg_emoji} 공포탐욕지수 : {fg_score}점 ({fg_rating})\n   ↳ {fg_comment}"
 
-# 보유종목
 core_msg = ""
 total_krw = 0
 total_from_high = 0
@@ -199,7 +261,6 @@ for name, code, qty, cur in holdings:
     except:
         pass
 
-# 뉴스
 sp_news = get_google_news("S&P500 뉴욕증시", 2)
 aapl_news = get_yahoo_news("AAPL", 2)
 if aapl_news == "▪️ 관련 뉴스 없음":
@@ -215,7 +276,6 @@ news_msg = f"""📰 오늘의 뉴스
 🏦 [CPI / FOMC]
 {cpi_news}"""
 
-# 아이디어
 avg_from_high = total_from_high / cnt if cnt else 0
 try:
     vix_price = yf.Ticker("^VIX").history(period="2d")["Close"].iloc[-1]
@@ -231,7 +291,6 @@ else:
     idea = "⏳ 보유 - 정해진 날짜에 정해진 금액만큼 적립 유지!"
     idea_emoji = "⏳"
 
-# 건강도
 score = 100
 if avg_from_high < -10:
     score -= 10
@@ -250,7 +309,6 @@ else:
     health_emoji = "💪"
     health = "조정 필요! 코어 비중 늘릴 때!"
 
-# 적립 전략
 if today.year <= 2026:
     pension, irp = PENSION_2026, IRP_2026
     period_label = "올해말까지"
@@ -277,10 +335,17 @@ if is_sunday:
 📅 다음 주 체크 : CPI / FOMC 일정 + 배당락일 확인
 """
 
+# ==================== 최종 메시지 ====================
 message = f"""━━━━━━━━━━━━━━━━
-💼 [포트폴리오 브리핑]
+☀️ [주베일 아침 브리핑]
 📅 {today_str} / {period_label}
 ━━━━━━━━━━━━━━━━
+{weather_msg}
+
+━━━━━━━━━━━━━━━━
+{english_msg}
+━━━━━━━━━━━━━━━━
+💼 [포트폴리오 브리핑]
 {alert_msg}
 📈 시장요약
 {market_msg}{fx_msg}
@@ -298,12 +363,6 @@ message = f"""━━━━━━━━━━━━━━━━
 ━━━━━━━━━━━━━━━━
 💡 오늘의 투자아이디어
 {idea_emoji} {idea}
-
-━━━━━━━━━━━━━━━━
-📆 경제일정 (24시간)
-⏰ CPI / PCE / FOMC / 실업률 / GDP
-   발표 당일 22:30 변동성 확대 주의!
-   적립 날짜를 발표 전후로 나누면 좋아요!
 
 ━━━━━━━━━━━━━━━━
 💰 이번달 투자전략 (총 5,000,000원)
