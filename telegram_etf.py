@@ -5,6 +5,7 @@ import xml.etree.ElementTree as ET
 from datetime import datetime, date, timedelta
 from urllib.parse import quote
 import math
+from zoneinfo import ZoneInfo
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 CHAT_ID = "8980328689"
@@ -15,10 +16,36 @@ IRP_2026 = 600000
 PENSION_2027 = 360000
 IRP_2027 = 250000
 
+# ==================== ⏰ 실행 시간 판단 (사우디 기준) ====================
+now_saudi = datetime.now(ZoneInfo("Asia/Riyadh"))
+now_ny = datetime.now(ZoneInfo("America/New_York"))
+is_dst = now_ny.dst() != timedelta(0)  # 미국만 서머타임 체크, 사우디는 고정
+market_open_saudi_hour = 16 if is_dst else 17  # 서머 16:30, 윈터 17:30
+
+# GitHub cron은 몇 분 늦을 수 있어서 여유를 둠
+if now_saudi.hour == 4 and 50 <= now_saudi.minute <= 59:
+    RUN_TYPE = "MORNING"
+elif now_saudi.hour == market_open_saudi_hour and 25 <= now_saudi.minute <= 59:
+    RUN_TYPE = "MARKET_OPEN"
+else:
+    # 수동 실행(workflow_dispatch)일 때는 아침 브리핑으로 처리
+    if os.environ.get("GITHUB_EVENT_NAME") == "workflow_dispatch":
+        RUN_TYPE = "MORNING"
+    else:
+        print(f"스킵! 사우디 {now_saudi.strftime('%H:%M')} / 뉴욕 DST {is_dst} / 개장 {market_open_saudi_hour}:30")
+        exit()
+
+# 미장은 주말에 안 열리니까 주말 개장 브리핑은 스킵
+if RUN_TYPE == "MARKET_OPEN" and now_saudi.weekday() >= 5:
+    print("주말이라 미장 휴장, 개장 브리핑 스킵")
+    exit()
+
+print(f"실행 타입: {RUN_TYPE} / 사우디 {now_saudi} / 개장 {market_open_saudi_hour}:30")
+
 # ==================== ✈️ 휴가 카운트다운 ====================
 def get_vacation_msg():
     base = date(2027, 1, 10)
-    today_d = datetime.now().date()
+    today_d = now_saudi.date()
     cycle = 84
     temp = base
     while temp < today_d:
@@ -85,8 +112,7 @@ ENGLISH_SENTENCES = [
 ]
 
 def get_english_3():
-    today = datetime.now()
-    day_of_year = today.timetuple().tm_yday
+    day_of_year = now_saudi.timetuple().tm_yday
     start = (day_of_year * 3) % len(ENGLISH_SENTENCES)
     picked = [ENGLISH_SENTENCES[(start + i) % len(ENGLISH_SENTENCES)] for i in range(3)]
     msg = "📚 오늘의 영어 3문장\n"
@@ -186,7 +212,7 @@ def bar(pct):
     filled = int(pct / 10)
     return "🟩" * filled + "⬜" * (10 - filled) + f" {pct:.0f}%"
 
-today = datetime.now()
+today = now_saudi
 today_str = today.strftime("%Y-%m-%d")
 is_sunday = today.weekday() == 6
 
@@ -243,7 +269,7 @@ else:
     fg_comment = "극단적 탐욕! 조심조심 ⚠️"
 fg_msg = f"{fg_emoji} 공포탐욕지수 : {fg_score}점 ({fg_rating})\n   ↳ {fg_comment}"
 
-# ==================== 📊 보유종목 전체 9종 (평일용 짧은 버전) ====================
+# ==================== 📊 보유종목 전체 9종 ====================
 core_msg = ""
 total_krw = 0
 total_from_high = 0
@@ -346,7 +372,31 @@ if is_sunday:
 📅 다음 주 체크 : CPI / FOMC 일정 + 배당락일 확인
 """
 
-message = f"""━━━━━━━━━━━━━━━━
+# ==================== 📩 메시지 분기 ====================
+if RUN_TYPE == "MARKET_OPEN":
+    # 개장용 짧은 버전 - 프리마켓 마감이 아니라 개장 직후 스냅샷
+    message = f"""━━━━━━━━━━━━━━━━
+🇺🇸 [미장 개장 브리핑]
+📅 {today_str} / 사우디 {now_saudi.strftime('%H:%M')} / 뉴욕 {now_ny.strftime('%H:%M')} ({'서머타임' if is_dst else '윈터타임'})
+━━━━━━━━━━━━━━━━
+{alert_msg}
+📈 시장요약 (전일 종가 기준)
+{market_msg}{fx_msg}
+{fg_msg}
+
+━━━━━━━━━━━━━━━━
+📊 보유종목 (전체 9종)
+{core_msg}
+💰 전체 평가액 약 {total_krw:,.0f}원
+
+━━━━━━━━━━━━━━━━
+💡 오늘의 투자아이디어
+{idea_emoji} {idea}
+━━━━━━━━━━━━━━━━
+"""
+else:
+    # 아침용 긴 버전 (기존 그대로)
+    message = f"""━━━━━━━━━━━━━━━━
 ☀️ [주베일 아침 브리핑]
 📅 {today_str} / {period_label}
 ━━━━━━━━━━━━━━━━
