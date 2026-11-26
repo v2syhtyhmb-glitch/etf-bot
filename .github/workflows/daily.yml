@@ -1,3 +1,10 @@
+name: Jubail Briefing
+on:
+  schedule:
+    - cron: '55 1 * * *'   # 사우디 오전 4:55
+    - cron: '30 13 * * *'  # 사우디 오후 4:30 = 미국 서머타임 개장
+    - cron: '30 14 * * *'  # 사우디 오후 5:30 = 미국 윈터타임 개장
+  workflow_dispatch:
 jobs:
   briefing:
     runs-on: ubuntu-latest
@@ -6,11 +13,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: 파일 찾기
-        run: |
-          pwd
-          ls -R
       - run: pip install yfinance requests
-      - run: python main.py
+      - run: python telegram_etf.py
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
