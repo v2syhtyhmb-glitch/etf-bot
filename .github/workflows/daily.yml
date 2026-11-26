@@ -2,7 +2,7 @@ name: Daily ETF Report
 
 on:
   schedule:
-    - cron: '0 2 * * *'
+    - cron: '14 1 * * *'
   workflow_dispatch:
 
 jobs:
