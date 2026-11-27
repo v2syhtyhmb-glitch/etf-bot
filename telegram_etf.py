@@ -22,18 +22,16 @@ now_ny = datetime.now(ZoneInfo("America/New_York"))
 is_dst = now_ny.dst() != timedelta(0)  # 미국만 서머타임 체크, 사우디는 고정
 market_open_saudi_hour = 16 if is_dst else 17  # 서머 16:30, 윈터 17:30
 
-# GitHub cron은 몇 분 늦을 수 있어서 여유를 둠
-if now_saudi.hour == 4 and 50 <= now_saudi.minute <= 59:
+# GitHub cron은 1시간까지 늦을 수 있어서 여유를 2시간으로 둠
+if os.environ.get("GITHUB_EVENT_NAME") == "workflow_dispatch":
     RUN_TYPE = "MORNING"
-elif now_saudi.hour == market_open_saudi_hour and 25 <= now_saudi.minute <= 59:
+elif 4 <= now_saudi.hour <= 6:
+    RUN_TYPE = "MORNING"
+elif market_open_saudi_hour <= now_saudi.hour <= market_open_saudi_hour + 1:
     RUN_TYPE = "MARKET_OPEN"
 else:
-    # 수동 실행(workflow_dispatch)일 때는 아침 브리핑으로 처리
-    if os.environ.get("GITHUB_EVENT_NAME") == "workflow_dispatch":
-        RUN_TYPE = "MORNING"
-    else:
-        print(f"스킵! 사우디 {now_saudi.strftime('%H:%M')} / 뉴욕 DST {is_dst} / 개장 {market_open_saudi_hour}:30")
-        exit()
+    print(f"스킵! 사우디 {now_saudi.strftime('%H:%M')} / 뉴욕 DST {is_dst} / 개장 {market_open_saudi_hour}:30")
+    exit()
 
 # 미장은 주말에 안 열리니까 주말 개장 브리핑은 스킵
 if RUN_TYPE == "MARKET_OPEN" and now_saudi.weekday() >= 5:
